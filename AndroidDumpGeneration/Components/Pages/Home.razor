@@ -1,5 +1,52 @@
 ﻿@page "/"
+@using Microsoft.Diagnostics.NETCore.Client
+@using System.Diagnostics
 
-<h1>Hello, world!</h1>
+<button @onclick="GenerateDumpAsync">Generate Dump</button>
 
-Welcome to your new app.
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div style="margin-top:20px; padding:10px; background-color:#fdd; border:1px solid #f00; color:#900; max-width:400px; white-space: pre-wrap; overflow-wrap: break-word;">
+        <strong>Error generating the dump:</strong><br />
+        @ErrorMessage
+    </div>
+}
+
+@code {
+
+    private string? ErrorMessage;
+
+    private async Task GenerateDumpAsync()
+    {
+        ErrorMessage = string.Empty;
+
+        try
+        {
+            await WriteDumpAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.ToString();
+        }
+    }
+
+    public async Task WriteDumpAsync()
+    {
+        string appDataDirectory = FileSystem.AppDataDirectory;
+        string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        string fileName = $"dump_{timestamp}.dmp";
+        string dumpPath = Path.Combine(appDataDirectory, "dumps");
+
+        int processId = Process.GetCurrentProcess().Id;
+        DiagnosticsClient client = new DiagnosticsClient(processId);
+
+        if (!Directory.Exists(dumpPath))
+            Directory.CreateDirectory(dumpPath);
+
+        DumpType dumpType = DumpType.Normal;
+
+        // Attempt to write the dump
+        await client.WriteDumpAsync(dumpType, Path.Combine(dumpPath, fileName), logDumpGeneration: false, CancellationToken.None);
+    }
+
+}
